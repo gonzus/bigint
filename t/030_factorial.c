@@ -11,13 +11,10 @@
                value, expected); \
     } while (0)
 
-static int test_factorial(void)
-{
+static int test_factorial(void) {
     char* buf = 0;
     int blen = 0;
-    bigint a;
-
-    bigint_init(&a);
+    bigint* a = bigint_create();
 
     static struct {
         int a;
@@ -645,12 +642,14 @@ static int test_factorial(void)
     };
 
     int count = sizeof(data) / sizeof(data[0]);
+    bigint* d = bigint_create();
     for (int j = 0; j < count; ++j) {
         int n = data[j].a;
         double l10 = 0;
-        bigint_assign_integer(&a, 1);
+        bigint_assign_integer(a, 1);
         for (int k = 2; k <= n; ++k) {
-            bigint_mul_integer(&a, k);
+            bigint_assign_integer(d, k);
+            bigint_muleq(a, d);
             l10 += log10(k);
         }
         int elen = (int) (1.0 + l10);
@@ -661,16 +660,16 @@ static int test_factorial(void)
             }
             buf = (char*) malloc(blen);
         }
-        OK(bigint_format(&a, buf), data[j].r);
+        OK(bigint_format(a, buf), data[j].r);
     }
+    bigint_destroy(d);
 
     free(buf);
-    bigint_fini(&a);
+    bigint_destroy(a);
     return count;
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     (void) argc;
     (void) argv;
     test_factorial();

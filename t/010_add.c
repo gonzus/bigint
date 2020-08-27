@@ -9,14 +9,10 @@
                value, expected); \
     } while (0)
 
-static int test_add(void)
-{
+static int test_add(void) {
     char buf[1000];
-    bigint a;
-    bigint b;
-
-    bigint_init(&a);
-    bigint_init(&b);
+    bigint* a = bigint_create();
+    bigint* b = bigint_create();
 
     static struct {
         const char* a;
@@ -24,14 +20,10 @@ static int test_add(void)
         const char* r;
     } data[] = {
         // really basic shit
-        {    "+0",    "+0",     "0" },
-        {    "+0",    "-0",     "0" },
-        {    "-0",    "+0",     "0" },
-        {    "-0",    "-0",     "0" },
-        {     "0",     "1",     "1" },
-        {     "1",     "0",     "1" },
-        {     "1",     "1",     "2" },
-        {     "1",    "-1",     "0" },
+        {    "0",    "0",     "0" },
+        {    "0",    "1",     "1" },
+        {    "1",    "0",     "1" },
+        {    "1",    "1",     "2" },
         // small shit
         { "12345", "67890", "80235" },
         // huge shit
@@ -252,19 +244,18 @@ static int test_add(void)
     };
     int count = sizeof(data) / sizeof(data[0]);
     for (int j = 0; j < count; ++j) {
-        bigint_assign_string(&a, data[j].a, 10);
-        bigint_assign_string(&b, data[j].b, 10);
-        bigint_add_bigint(&a, &b);
-        OK(bigint_format(&a, buf), data[j].r);
+        bigint_assign_string(a, data[j].a);
+        bigint_assign_string(b, data[j].b);
+        bigint_addeq(a, b);
+        OK(bigint_format(a, buf), data[j].r);
     }
 
-    bigint_fini(&b);
-    bigint_fini(&a);
+    bigint_destroy(b);
+    bigint_destroy(a);
     return count;
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     (void) argc;
     (void) argv;
     test_add();

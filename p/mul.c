@@ -3,11 +3,8 @@
 #include "timer.h"
 #include "bigint.h"
 
-static int test_mul_integer(void)
-{
-    bigint a;
-
-    bigint_init(&a);
+static int test_mul_integer(void) {
+    bigint* a = bigint_create();
 
     static struct {
         const char* a;
@@ -15,16 +12,9 @@ static int test_mul_integer(void)
         const char* r;
     } data[] = {
         // really basic shit
-        {       "+0",       +0,                "0" },
-        {       "+0",       -0,                "0" },
-        {       "-0",       +0,                "0" },
-        {       "-0",       -0,                "0" },
+        {        "0",        0,                "0" },
         {        "1",        1,                "1" },
-        {        "1",       -1,               "-1" },
-        {       "-1",        1,               "-1" },
-        {       "-1",       -1,                "1" },
         {       "11",        1,               "11" },
-        {       "11",       -1,              "-11" },
         // small shit
         {        "9",        9,               "81" },
         {       "99",       99,             "9801" },
@@ -35,13 +25,15 @@ static int test_mul_integer(void)
         {    "76324",     1234,         "94183816" },
     };
     int count = sizeof(data) / sizeof(data[0]);
+    bigint* b = bigint_create();
     for (int j = 0; j < count; ++j) {
-        bigint_assign_string(&a, data[j].a, 10);
-        long b = data[j].b;
-        bigint_mul_integer(&a, b);
+        bigint_assign_string(a, data[j].a);
+        bigint_assign_integer(b, data[j].b);
+        bigint_muleq(a, b);
     }
+    bigint_destroy(b);
 
-    bigint_fini(&a);
+    bigint_destroy(a);
     return count;
 }
 

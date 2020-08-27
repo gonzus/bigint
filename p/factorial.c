@@ -5,9 +5,7 @@
 
 static int test_factorial(void)
 {
-    bigint a;
-
-    bigint_init(&a);
+    bigint* a = bigint_create();
 
     static struct {
         int a;
@@ -635,15 +633,18 @@ static int test_factorial(void)
     };
 
     int count = sizeof(data) / sizeof(data[0]);
+    bigint* d = bigint_create();
     for (int j = 0; j < count; ++j) {
         int n = data[j].a;
-        bigint_assign_integer(&a, 1);
+        bigint_assign_integer(a, 1);
         for (int k = 2; k <= n; ++k) {
-            bigint_mul_integer(&a, k);
+            bigint_assign_integer(d, k);
+            bigint_muleq(a, d);
         }
     }
+    bigint_destroy(d);
 
-    bigint_fini(&a);
+    bigint_destroy(a);
     return count;
 }
 
