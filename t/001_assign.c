@@ -6,12 +6,12 @@
     do { \
         const char* got = value; \
         printf("%-3s [%s] == [%s]\n", \
-               strcmp(got, expected) == 0 ? "OK" : "NOK", \
+               strcmp(got, expected) == 0 ? "OK" : "XX", \
                got, expected); \
     } while (0)
 
 static int test_assign_int(void) {
-    static int data[] = {
+    static unsigned long long data[] = {
         0,
         1,
         9,
@@ -19,6 +19,7 @@ static int test_assign_int(void) {
         11,
         12,
         19710426,
+        4367125871342043,
     };
     char bufb[1000];
     char buft[1000];
@@ -26,8 +27,20 @@ static int test_assign_int(void) {
     int count = sizeof(data) / sizeof(data[0]);
     for (int j = 0; j < count; ++j) {
         bigint_assign_integer(b, data[j]);
-        sprintf(buft, "%d", data[j]);
+        sprintf(buft, "%llu", data[j]);
         OK(bigint_format(b, bufb), buft);
+
+        unsigned long long v = data[j];
+        while (1) {
+            bigint_assign_integer(b, v);
+            unsigned m = bigint_mod_integer(b, 10);
+            unsigned d = v % 10;
+            printf("%s MOD %u %u %llu\n", m == d ? "OK" : "XX", m, d, v);
+            if (!v) {
+                break;
+            }
+            v /= 10;
+        }
     }
     bigint_destroy(b);
     return count;

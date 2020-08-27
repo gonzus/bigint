@@ -5,7 +5,7 @@
 #define OK(value, expected) \
     do { \
         printf("%-3s [%s] == [%s]\n", \
-               strcmp(value, expected) == 0 ? "OK" : "NOK", \
+               strcmp(value, expected) == 0 ? "OK" : "XX", \
                value, expected); \
     } while (0)
 

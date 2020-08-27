@@ -230,6 +230,14 @@ bigint* bigint_muleq(bigint* b, const bigint* n) {
     return bigint_muleq_base(b, n, BIGINT_LIMB_BASE);
 }
 
+bigint_limb_t bigint_mod_integer(bigint* b, bigint_limb_t value) {
+    bigint_larger_t mod = 0;
+    for (int j = b->pos - 1; j >= 0; --j) {
+        mod = (mod * BIGINT_LIMB_BASE + b->lmb[j]) % value;
+    }
+    return mod;
+}
+
 static void check_size(bigint* b, size_t p) {
     if (b->cap > p) {
         return;

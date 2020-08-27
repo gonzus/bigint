@@ -58,4 +58,6 @@ void bigint_print(const char* msg, const bigint* b, FILE* stream, int newline);
 bigint* bigint_addeq(bigint* b, const bigint* n);
 bigint* bigint_muleq(bigint* b, const bigint* n);
 
+bigint_limb_t bigint_mod_integer(bigint* b, bigint_limb_t value);
+
 #endif
