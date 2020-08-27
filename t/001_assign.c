@@ -4,16 +4,20 @@
 
 #define OK(value, expected) \
     do { \
+        const char* got = value; \
         printf("%-3s [%s] == [%s]\n", \
-               strcmp(value, expected) == 0 ? "OK" : "NOK", \
-               value, expected); \
+               strcmp(got, expected) == 0 ? "OK" : "NOK", \
+               got, expected); \
     } while (0)
 
 static int test_assign_int(void) {
     static int data[] = {
         0,
         1,
+        9,
+        10,
         11,
+        12,
         19710426,
     };
     char bufb[1000];
@@ -33,7 +37,10 @@ static int test_assign_string(void) {
     static const char* data[] = {
         "0",
         "1",
+        "9",
+        "10",
         "11",
+        "12",
         "19710426",
         "19961111197104262002101920050730",
     };
@@ -55,12 +62,11 @@ static int test_assign_string(void) {
     return count;
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     (void) argc;
     (void) argv;
     test_assign_int();
-    // test_assign_string();
+    test_assign_string();
 
     return 0;
 }

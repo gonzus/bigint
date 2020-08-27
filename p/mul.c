@@ -37,8 +37,7 @@ static int test_mul_integer(void) {
     return count;
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     (void) argc;
     (void) argv;
     int count = 0;

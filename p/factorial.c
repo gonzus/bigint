@@ -3,8 +3,7 @@
 #include "timer.h"
 #include "bigint.h"
 
-static int test_factorial(void)
-{
+static int test_factorial(void) {
     bigint* a = bigint_create();
 
     static struct {
@@ -117,6 +116,7 @@ static int test_factorial(void)
            "000000000000000000000000000000"
            "000000000000000000000000000000"
            "000000000000000000" },
+#if 0
         {
            10000,
           "2846259680917054518906413212119868890148051401702799230794179994274411"
@@ -630,6 +630,7 @@ static int test_factorial(void)
           "0000000000000000000000000000000000000000000000000000000000000000000000"
           "000000000000000000000000000000"
         },
+#endif
     };
 
     int count = sizeof(data) / sizeof(data[0]);
@@ -648,14 +649,13 @@ static int test_factorial(void)
     return count;
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     (void) argc;
     (void) argv;
     int count = 0;
     Timer t;
     timer_start(&t);
-    for (int j = 0; j < 10; ++j) {
+    for (int j = 0; j < 1000; ++j) {
         count += test_factorial();
     }
     timer_stop(&t);
