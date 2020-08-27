@@ -21,12 +21,12 @@ void timer_format_elapsed(Timer* t, FILE* fp, int newline)
         unsigned long min;
         const char* name;
     } units[] = {
-        { 24 * 60 * 60 * 1000000, "day" },
-        {      60 * 60 * 1000000, "h"   },
-        {           60 * 1000000, "min" },
-        {                1000000, "s"   },
-        {                   1000, "ms"  },
-        {                      0, "us"  },  // default
+        { 24 * 60 * 60 * 1000000UL, "day" },
+        {      60 * 60 * 1000000UL, "h"   },
+        {           60 * 1000000UL, "min" },
+        {                1000000UL, "s"   },
+        {                   1000UL, "ms"  },
+        {                      0UL, "us"  },  // default
     };
     unsigned long us = timer_elapsed(t);
     for (int j = 0; 1; ++j) {

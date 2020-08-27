@@ -265,6 +265,8 @@ static int test_add(void)
 
 int main(int argc, char* argv[])
 {
+    (void) argc;
+    (void) argv;
     test_add();
 
     return 0;

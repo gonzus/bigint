@@ -152,6 +152,8 @@ static int test_sub_integer(void)
 
 int main(int argc, char* argv[])
 {
+    (void) argc;
+    (void) argv;
     test_sub();
     test_sub_integer();
 

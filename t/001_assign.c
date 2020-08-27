@@ -71,6 +71,8 @@ static int test_assign_string(void)
 
 int main(int argc, char* argv[])
 {
+    (void) argc;
+    (void) argv;
     test_assign_int();
     test_assign_string();
 

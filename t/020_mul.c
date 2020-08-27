@@ -108,6 +108,8 @@ static int test_mul_integer(void)
 
 int main(int argc, char* argv[])
 {
+    (void) argc;
+    (void) argv;
     test_mul();
     test_mul_integer();
 

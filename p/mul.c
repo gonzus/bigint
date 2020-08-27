@@ -47,6 +47,8 @@ static int test_mul_integer(void)
 
 int main(int argc, char* argv[])
 {
+    (void) argc;
+    (void) argv;
     int count = 0;
     Timer t;
     timer_start(&t);

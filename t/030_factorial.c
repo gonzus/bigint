@@ -649,9 +649,9 @@ static int test_factorial(void)
         int n = data[j].a;
         double l10 = 0;
         bigint_assign_integer(&a, 1);
-        for (int j = 2; j <= n; ++j) {
-            bigint_mul_integer(&a, j);
-            l10 += log10(j);
+        for (int k = 2; k <= n; ++k) {
+            bigint_mul_integer(&a, k);
+            l10 += log10(k);
         }
         int elen = (int) (1.0 + l10);
         if (blen <= elen) {
@@ -671,6 +671,8 @@ static int test_factorial(void)
 
 int main(int argc, char* argv[])
 {
+    (void) argc;
+    (void) argv;
     test_factorial();
 
     return 0;

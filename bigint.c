@@ -36,10 +36,15 @@ static void show(const char* msg,
         printf("%s%"BIGINT_LIMB_FMT"", first ? "" : ":", b->limbs[j]);
     }
     printf("] -- %"BIGINT_LARGER_FMT"\n", value);
+#else
+    (void) msg;
+    (void) b;
+    (void) base;
+    (void) value;
 #endif
 }
 
-static void check_size(bigint* b, int p)
+static void check_size(bigint* b, size_t p)
 {
     if (b->size > p) {
         return;
@@ -148,19 +153,17 @@ static int magnitudeCmpBigint(const bigint* a, const bigint* b)
 
 static int magnitudeCmpInteger(const bigint* a, long b)
 {
-    if (b < 0){
-        b = -b;
-    }
+    unsigned long x = (unsigned long) (b < 0 ? -b : b);
     bigint_larger_t val = 0;
     bigint_larger_t mul = 1;
     for (int j = 0; j < a->pos; ++j) {
         val += mul * a->limbs[j];
-        if (val > b) {
+        if (val > x) {
             return 1;
         }
         mul *= BIGINT_LIMB_BASE;
     }
-    if (val < b) {
+    if (val < x) {
         return -1;
     }
     return 0;

@@ -638,8 +638,8 @@ static int test_factorial(void)
     for (int j = 0; j < count; ++j) {
         int n = data[j].a;
         bigint_assign_integer(&a, 1);
-        for (int j = 2; j <= n; ++j) {
-            bigint_mul_integer(&a, j);
+        for (int k = 2; k <= n; ++k) {
+            bigint_mul_integer(&a, k);
         }
     }
 
@@ -649,6 +649,8 @@ static int test_factorial(void)
 
 int main(int argc, char* argv[])
 {
+    (void) argc;
+    (void) argv;
     int count = 0;
     Timer t;
     timer_start(&t);
