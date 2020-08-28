@@ -1,6 +1,23 @@
 #ifndef BIGINT_H_
 #define BIGINT_H_
 
+/*
+ * A bare-bones implementation of bigints -- integers without a size limit.
+ *
+ *
+ * TODO
+ *
+ * Allow specifying the effective value of BIGINT_LIMB_BASE, so that it is
+ * easier to write tests that check results.
+ *
+ * Add support for negative numbers.
+ *
+ * Add support for subtraction.
+ *
+ * Implement Karatsuba multiplication algorithm -- https://en.wikipedia.org/wiki/Karatsuba_algorithm
+ *
+ * Add support for integer division.
+ */
 #include <stdint.h>
 #include <stdio.h>
 
@@ -59,5 +76,7 @@ bigint* bigint_addeq(bigint* b, const bigint* n);
 bigint* bigint_muleq(bigint* b, const bigint* n);
 
 bigint_limb_t bigint_mod_integer(bigint* b, bigint_limb_t value);
+
+void bigint_factorial(bigint_limb_t n, bigint* b);
 
 #endif

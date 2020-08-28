@@ -2,6 +2,7 @@
 *.a
 *.so
 *.swp
+gmon.out
 p/factorial
 p/mul
 p/sub
@@ -10,4 +11,3 @@ t/010_add
 t/011_sub
 t/020_mul
 t/030_factorial
-

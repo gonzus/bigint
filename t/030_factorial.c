@@ -2,23 +2,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "timer.h"
 #include "bigint.h"
 
-#define OK(value, expected) \
-    do { \
-        printf("%-3s [%s] == [%s]\n", \
-               strcmp(value, expected) == 0 ? "OK" : "XX", \
-               value, expected); \
-    } while (0)
+#define ALEN(a) (int) ((sizeof(a) / sizeof((a)[0])))
 
-static int test_factorial(void) {
-    char* buf = 0;
-    int blen = 0;
-    bigint* a = bigint_create();
-
+static void test_factorial(void) {
     static struct {
-        int a;
-        const char* r;
+        int n;
+        const char* f;
     } data[] = {
         // really basic shit
         {      1,                     "1" },
@@ -251,7 +243,7 @@ static int test_factorial(void) {
           "0000000000000000000000000000000"
           "00000000000000000",
         },
-#if 0
+#if 1
         {
            10000,
           "2846259680917054518906413212119868890148051401702799230794179994274411"
@@ -768,32 +760,21 @@ static int test_factorial(void) {
 #endif
     };
 
-    int count = sizeof(data) / sizeof(data[0]);
-    bigint* d = bigint_create();
-    for (int j = 0; j < count; ++j) {
-        int n = data[j].a;
-        double l10 = 0;
-        bigint_assign_integer(a, 1);
-        for (int k = 2; k <= n; ++k) {
-            bigint_assign_integer(d, k);
-            bigint_muleq(a, d);
-            l10 += log10(k);
-        }
-        int elen = (int) (1.0 + l10);
-        if (blen <= elen) {
-            free(buf);
-            while (blen <= elen) {
-                blen = (blen == 0 ? 8 : blen*2);
-            }
-            buf = (char*) malloc(blen);
-        }
-        OK(bigint_format(a, buf), data[j].r);
-    }
-    bigint_destroy(d);
+    bigint* f = bigint_create();
+    bigint* e = bigint_create();
+    Timer t;
+    for (int j = 0; j < ALEN(data); ++j) {
+        int n = data[j].n;
+        timer_start(&t);
+        bigint_factorial(n, f);
+        timer_stop(&t);
 
-    free(buf);
-    bigint_destroy(a);
-    return count;
+        bigint_assign_string(e, data[j].f);
+        int ok = bigint_compare(f, e) == 0;
+        printf("%-3s [%s] -- ", ok ? "OK" : "XX", data[j].f);
+        timer_format_elapsed(&t, stdout, 1);
+    }
+    bigint_destroy(f);
 }
 
 int main(int argc, char* argv[]) {

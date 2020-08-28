@@ -5,7 +5,9 @@ LIBNAME = libbigint
 #-----------
 
 CFLAGS += -Wall -Wextra -Wpedantic -Wshadow
-CFLAGS += -g
+# CFLAGS += -g
+CFLAGS += -O
+# CFLAGS += -pg
 # CFLAGS += -DDEBUG
 
 LIBS = -lm
