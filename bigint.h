@@ -7,8 +7,6 @@
  *
  * TODO
  *
- * Add support for negative numbers.
- *
  * Add support for subtraction.
  *
  * Implement Karatsuba multiplication algorithm -- https://en.wikipedia.org/wiki/Karatsuba_algorithm
@@ -48,9 +46,10 @@ typedef uint16_t bigint_larger_t;
  * constant BIGINT_LIMB_BITS.
  */
 typedef struct bigint {
-    uint32_t cap;
-    uint32_t pos;
-    bigint_limb_t* lmb;
+    uint32_t cap;            // total size of allocated lmb array
+    uint32_t pos;            // used size of allocated lmb array
+    uint8_t neg;             // sign of number: 0=positive, 1=negative
+    bigint_limb_t* lmb;      // allocated "limb" array -- bigint "digits"
 } bigint;
 
 // Create an empty (zero) bigint
@@ -78,7 +77,7 @@ int bigint_is_one(const bigint* b);
 int bigint_compare(const bigint* a, const bigint* b);
 
 // Assign a numeric value to bigint b
-bigint* bigint_assign_integer(bigint* b, unsigned long long value);
+bigint* bigint_assign_integer(bigint* b, long long value);
 
 // Assign the base-10 value stated in a string to bigint b
 bigint* bigint_assign_string(bigint* b, const char* value);
@@ -87,19 +86,18 @@ bigint* bigint_assign_string(bigint* b, const char* value);
 bigint* bigint_assign_bigint(bigint* b, const bigint* n);
 
 // Format bigint b as a base-10 number into a string buffer
+// TODO: change this to use a buffer
 char* bigint_format(const bigint* b, char* buf);
 
 // Print bigint b as a base-10 number into a FILE stream.
 // Optional prepending message and newline.
 void bigint_print(const char* msg, const bigint* b, FILE* stream, int newline);
 
-// Compute b += n
-// FIXME: maybe change this interface? Unwieldy?
-bigint* bigint_addeq(bigint* b, const bigint* n);
+// Compute a = l + r and return a
+bigint* bigint_add(const bigint* l, const bigint* r, bigint* a);
 
-// Compute b *= n
-// FIXME: maybe change this interface? Unwieldy?
-bigint* bigint_muleq(bigint* b, const bigint* n);
+// Compute a = l * r and return a
+bigint* bigint_mul(const bigint* l, const bigint* r, bigint* a);
 
 // Compute b % value
 bigint_limb_t bigint_mod_integer(bigint* b, bigint_limb_t value);

@@ -15,6 +15,9 @@ static void test_add(void) {
         {    "0",    "1",     "1" },
         {    "1",    "0",     "1" },
         {    "1",    "1",     "2" },
+        {   "-1",   "-1",    "-2" },
+        // {    "1",   "-1",     "0" }, TODO this aborts
+        // {   "-1",    "1",     "0" }, TODO this aborts
         // small shit
         { "12345", "67890", "80235" },
         // huge shit
@@ -236,20 +239,22 @@ static void test_add(void) {
 
     bigint* l = bigint_create();
     bigint* r = bigint_create();
+    bigint* g = bigint_create();
     bigint* e = bigint_create();
     Timer t;
     for (int j = 0; j < ALEN(data); ++j) {
         bigint_assign_string(l, data[j].l);
         bigint_assign_string(r, data[j].r);
         timer_start(&t);
-        bigint_addeq(l, r);
+        bigint_add(l, r, g);
         timer_stop(&t);
 
         bigint_assign_string(e, data[j].e);
-        int ok = bigint_compare(l, e) == 0;
+        int ok = bigint_compare(g, e) == 0;
         printf("%-3s [%s] -- ", ok ? "OK" : "XX", data[j].e);
         timer_format_elapsed(&t, stdout, 1);
     }
+    bigint_destroy(g);
     bigint_destroy(e);
     bigint_destroy(r);
     bigint_destroy(l);

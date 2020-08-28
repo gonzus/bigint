@@ -5,12 +5,13 @@
 #define ALEN(a) (int) ((sizeof(a) / sizeof((a)[0])))
 
 static void test_assign_int(void) {
-    static unsigned long long data[] = {
+    static long long data[] = {
         0,
         1,
         9,
         10,
         11,
+        -11,
         12,
         19710426,
         4367125871342043,
@@ -20,25 +21,29 @@ static void test_assign_int(void) {
     bigint* e = bigint_create();
     Timer t;
     for (int j = 0; j < ALEN(data); ++j) {
-        unsigned long long v = data[j];
+        long long v = data[j];
         timer_start(&t);
         bigint_assign_integer(b, v);
         timer_stop(&t);
 
         char buf[1000];
-        sprintf(buf, "%llu", data[j]);
+        sprintf(buf, "%lld", data[j]);
         bigint_assign_string(e, buf);
 
         int ok = bigint_compare(b, e) == 0;
-        printf("%-3s [%llu] -- ", ok ? "OK" : "XX", v);
+        printf("%-3s [%lld] -- ", ok ? "OK" : "XX", v);
         timer_format_elapsed(&t, stdout, 1);
+
+        if (v < 0) {
+            continue;
+        }
 
         while (1) {
             timer_start(&t);
             unsigned m = bigint_mod_integer(b, 10);
             timer_stop(&t);
             unsigned d = v % 10;
-            printf("%s MOD %u %u %llu -- ", m == d ? "OK" : "XX", m, d, v);
+            printf("%s MOD %u %u %lld -- ", m == d ? "OK" : "XX", m, d, v);
             timer_format_elapsed(&t, stdout, 1);
             if (!v) {
                 break;

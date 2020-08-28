@@ -13,6 +13,10 @@ static void test_mul(void) {
         // really basic shit
         {        "0",        "0",                "0" },
         {        "1",        "1",                "1" },
+        {       "+1",       "+1",               "+1" },
+        {       "+1",       "-1",               "-1" },
+        {       "-1",       "+1",               "-1" },
+        {       "-1",       "-1",               "+1" },
         {       "11",        "1",               "11" },
         // small shit
         {        "9",        "9",               "81" },
@@ -32,21 +36,23 @@ static void test_mul(void) {
 
     bigint* l = bigint_create();
     bigint* r = bigint_create();
+    bigint* g = bigint_create();
     bigint* e = bigint_create();
     Timer t;
     for (int j = 0; j < ALEN(data); ++j) {
         bigint_assign_string(l, data[j].l);
         bigint_assign_string(r, data[j].r);
         timer_start(&t);
-        bigint_muleq(l, r);
+        bigint_mul(l, r, g);
         timer_stop(&t);
 
         bigint_assign_string(e, data[j].e);
-        int ok = bigint_compare(l, e) == 0;
+        int ok = bigint_compare(g, e) == 0;
         printf("%-3s [%s] -- ", ok ? "OK" : "XX", data[j].e);
         timer_format_elapsed(&t, stdout, 1);
     }
     bigint_destroy(e);
+    bigint_destroy(g);
     bigint_destroy(r);
     bigint_destroy(l);
 }

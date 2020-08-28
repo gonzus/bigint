@@ -2,13 +2,13 @@
 #include "timer.h"
 #include "bigint.h"
 
-static int test_mul_integer(void) {
-    bigint* a = bigint_create();
+#define ALEN(a) (int) ((sizeof(a) / sizeof((a)[0])))
 
+static int test_mul_integer(void) {
     static struct {
-        const char* a;
-        long b;
-        const char* r;
+        const char* l;
+        long r;
+        const char* e;
     } data[] = {
         // really basic shit
         {        "0",        0,                "0" },
@@ -23,16 +23,31 @@ static int test_mul_integer(void) {
         {       "11",       34,              "374" },
         {    "76324",     1234,         "94183816" },
     };
-    int count = sizeof(data) / sizeof(data[0]);
-    bigint* b = bigint_create();
-    for (int j = 0; j < count; ++j) {
-        bigint_assign_string(a, data[j].a);
-        bigint_assign_integer(b, data[j].b);
-        bigint_muleq(a, b);
-    }
-    bigint_destroy(b);
 
-    bigint_destroy(a);
+    bigint* l = bigint_create();
+    bigint* r = bigint_create();
+    bigint* g = bigint_create();
+    bigint* e = bigint_create();
+    int count = 0;
+    for (int j = 0; j < ALEN(data); ++j) {
+        bigint_assign_string(l, data[j].l);
+        bigint_assign_integer(r, data[j].r);
+        bigint_mul(l, r, g);
+
+#if 0
+        bigint_assign_string(e, data[j].e);
+        int ok = bigint_compare(g, e) == 0;
+        if (!ok) {
+            continue;
+        }
+#endif
+        ++count;
+    }
+    bigint_destroy(e);
+    bigint_destroy(g);
+    bigint_destroy(r);
+    bigint_destroy(l);
+
     return count;
 }
 

@@ -7,7 +7,7 @@
 static int test_factorial(void) {
     static struct {
         int n;
-        const char* f;
+        const char* e;
     } data[] = {
         // really basic shit
         {      1,                     "1" },
@@ -757,13 +757,24 @@ static int test_factorial(void) {
 #endif
     };
 
-    bigint* f = bigint_create();
-    int count = ALEN(data);
-    for (int j = 0; j < count; ++j) {
+    bigint* g = bigint_create();
+    bigint* e = bigint_create();
+    int count = 0;
+    for (int j = 0; j < ALEN(data); ++j) {
         int n = data[j].n;
-        bigint_factorial(n, f);
+        bigint_factorial(n, g);
+
+#if 0
+        bigint_assign_string(e, data[j].e);
+        int ok = bigint_compare(g, e) == 0;
+        if (!ok) {
+            continue;
+        }
+#endif
+        ++count;
     }
-    bigint_destroy(f);
+    bigint_destroy(e);
+    bigint_destroy(g);
     return count;
 }
 

@@ -28,14 +28,18 @@ void timer_format_elapsed(Timer* t, FILE* fp, int newline) {
         {               60UL * USECS_IN_A_SEC, "m"  },
         {                      USECS_IN_A_SEC, "s"  },
         {                     USECS_IN_A_MSEC, "ms" },
-        { /* default, catch all */        1UL, "us" },
+        { /* default, catch all */        0UL, "us" },
     };
     unsigned long us = timer_elapsed_us(t);
-    for (int j = 0; 1; ++j) {
-        if (us > units[j].min) {
-            float value = us / (float) units[j].min;
-            fprintf(fp, "%.2f %s", value, units[j].name);
-            break;
+    if (us == 0UL) {
+        fprintf(fp, "0 us");
+    } else {
+        for (int j = 0; 1; ++j) {
+            if (us > units[j].min) {
+                float value = us / (float) units[j].min;
+                fprintf(fp, "%.2f %s", value, units[j].name);
+                break;
+            }
         }
     }
 
