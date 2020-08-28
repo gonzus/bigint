@@ -1,14 +1,13 @@
 #include <stdio.h>
-#include <string.h>
 #include "timer.h"
 #include "bigint.h"
 
-static int test_factorial(void) {
-    bigint* a = bigint_create();
+#define ALEN(a) (int) ((sizeof(a) / sizeof((a)[0])))
 
+static int test_factorial(void) {
     static struct {
-        int a;
-        const char* r;
+        int n;
+        const char* f;
     } data[] = {
         // really basic shit
         {      1,                     "1" },
@@ -758,19 +757,13 @@ static int test_factorial(void) {
 #endif
     };
 
-    int count = sizeof(data) / sizeof(data[0]);
-    bigint* d = bigint_create();
+    bigint* f = bigint_create();
+    int count = ALEN(data);
     for (int j = 0; j < count; ++j) {
-        int n = data[j].a;
-        bigint_assign_integer(a, 1);
-        for (int k = 2; k <= n; ++k) {
-            bigint_assign_integer(d, k);
-            bigint_muleq(a, d);
-        }
+        int n = data[j].n;
+        bigint_factorial(n, f);
     }
-    bigint_destroy(d);
-
-    bigint_destroy(a);
+    bigint_destroy(f);
     return count;
 }
 

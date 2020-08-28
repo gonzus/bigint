@@ -1,23 +1,14 @@
 #include <stdio.h>
-#include <string.h>
+#include "timer.h"
 #include "bigint.h"
 
-#define OK(value, expected) \
-    do { \
-        printf("%-3s [%s] == [%s]\n", \
-               strcmp(value, expected) == 0 ? "OK" : "XX", \
-               value, expected); \
-    } while (0)
+#define ALEN(a) (int) ((sizeof(a) / sizeof((a)[0])))
 
-static int test_add(void) {
-    char buf[1000];
-    bigint* a = bigint_create();
-    bigint* b = bigint_create();
-
+static void test_add(void) {
     static struct {
-        const char* a;
-        const char* b;
+        const char* l;
         const char* r;
+        const char* e;
     } data[] = {
         // really basic shit
         {    "0",    "0",     "0" },
@@ -242,17 +233,26 @@ static int test_add(void) {
           "3455868656103231025748008611677",
         },
     };
-    int count = sizeof(data) / sizeof(data[0]);
-    for (int j = 0; j < count; ++j) {
-        bigint_assign_string(a, data[j].a);
-        bigint_assign_string(b, data[j].b);
-        bigint_addeq(a, b);
-        OK(bigint_format(a, buf), data[j].r);
-    }
 
-    bigint_destroy(b);
-    bigint_destroy(a);
-    return count;
+    bigint* l = bigint_create();
+    bigint* r = bigint_create();
+    bigint* e = bigint_create();
+    Timer t;
+    for (int j = 0; j < ALEN(data); ++j) {
+        bigint_assign_string(l, data[j].l);
+        bigint_assign_string(r, data[j].r);
+        timer_start(&t);
+        bigint_addeq(l, r);
+        timer_stop(&t);
+
+        bigint_assign_string(e, data[j].e);
+        int ok = bigint_compare(l, e) == 0;
+        printf("%-3s [%s] -- ", ok ? "OK" : "XX", data[j].e);
+        timer_format_elapsed(&t, stdout, 1);
+    }
+    bigint_destroy(e);
+    bigint_destroy(r);
+    bigint_destroy(l);
 }
 
 int main(int argc, char* argv[]) {

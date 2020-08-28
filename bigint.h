@@ -7,9 +7,6 @@
  *
  * TODO
  *
- * Allow specifying the effective value of BIGINT_LIMB_BASE, so that it is
- * easier to write tests that check results.
- *
  * Add support for negative numbers.
  *
  * Add support for subtraction.
@@ -56,27 +53,58 @@ typedef struct bigint {
     bigint_limb_t* lmb;
 } bigint;
 
+// Create an empty (zero) bigint
 bigint* bigint_create(void);
+
+// Clone an existing bigint into a new one
 bigint* bigint_clone(bigint* b);
+
+// Destroy a bigint
 void bigint_destroy(bigint* b);
+
+// Clear a bigint, leaving its value as zero.
+// It does not get rid of any allocated memory, so it is cheap to reuse the
+// bigint.
 bigint* bigint_clear(bigint* b);
 
+// Return true if the value of b is zero.
 int bigint_is_zero(const bigint* b);
+
+// Return true if the value of b is one.
 int bigint_is_one(const bigint* b);
+
+// Compare two bigints a and b, returning:
+// a < b: -1   a == b: 0   a > b: +1
 int bigint_compare(const bigint* a, const bigint* b);
 
+// Assign a numeric value to bigint b
 bigint* bigint_assign_integer(bigint* b, unsigned long long value);
+
+// Assign the base-10 value stated in a string to bigint b
 bigint* bigint_assign_string(bigint* b, const char* value);
+
+// Assign the value of bigint n to bigint b
 bigint* bigint_assign_bigint(bigint* b, const bigint* n);
 
+// Format bigint b as a base-10 number into a string buffer
 char* bigint_format(const bigint* b, char* buf);
+
+// Print bigint b as a base-10 number into a FILE stream.
+// Optional prepending message and newline.
 void bigint_print(const char* msg, const bigint* b, FILE* stream, int newline);
 
+// Compute b += n
+// FIXME: maybe change this interface? Unwieldy?
 bigint* bigint_addeq(bigint* b, const bigint* n);
+
+// Compute b *= n
+// FIXME: maybe change this interface? Unwieldy?
 bigint* bigint_muleq(bigint* b, const bigint* n);
 
+// Compute b % value
 bigint_limb_t bigint_mod_integer(bigint* b, bigint_limb_t value);
 
+// Compute n! and store the value in bigint b.
 void bigint_factorial(bigint_limb_t n, bigint* b);
 
 #endif

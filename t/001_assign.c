@@ -1,16 +1,10 @@
 #include <stdio.h>
-#include <string.h>
+#include "timer.h"
 #include "bigint.h"
 
-#define OK(value, expected) \
-    do { \
-        const char* got = value; \
-        printf("%-3s [%s] == [%s]\n", \
-               strcmp(got, expected) == 0 ? "OK" : "XX", \
-               got, expected); \
-    } while (0)
+#define ALEN(a) (int) ((sizeof(a) / sizeof((a)[0])))
 
-static int test_assign_int(void) {
+static void test_assign_int(void) {
     static unsigned long long data[] = {
         0,
         1,
@@ -21,65 +15,45 @@ static int test_assign_int(void) {
         19710426,
         4367125871342043,
     };
-    char bufb[1000];
-    char buft[1000];
-    bigint* b = bigint_create();
-    int count = sizeof(data) / sizeof(data[0]);
-    for (int j = 0; j < count; ++j) {
-        bigint_assign_integer(b, data[j]);
-        sprintf(buft, "%llu", data[j]);
-        OK(bigint_format(b, bufb), buft);
 
+    bigint* b = bigint_create();
+    bigint* e = bigint_create();
+    Timer t;
+    for (int j = 0; j < ALEN(data); ++j) {
         unsigned long long v = data[j];
+        timer_start(&t);
+        bigint_assign_integer(b, v);
+        timer_stop(&t);
+
+        char buf[1000];
+        sprintf(buf, "%llu", data[j]);
+        bigint_assign_string(e, buf);
+
+        int ok = bigint_compare(b, e) == 0;
+        printf("%-3s [%llu] -- ", ok ? "OK" : "XX", v);
+        timer_format_elapsed(&t, stdout, 1);
+
         while (1) {
-            bigint_assign_integer(b, v);
+            timer_start(&t);
             unsigned m = bigint_mod_integer(b, 10);
+            timer_stop(&t);
             unsigned d = v % 10;
-            printf("%s MOD %u %u %llu\n", m == d ? "OK" : "XX", m, d, v);
+            printf("%s MOD %u %u %llu -- ", m == d ? "OK" : "XX", m, d, v);
+            timer_format_elapsed(&t, stdout, 1);
             if (!v) {
                 break;
             }
             v /= 10;
+            bigint_assign_integer(b, v);
         }
     }
     bigint_destroy(b);
-    return count;
-}
-
-static int test_assign_string(void) {
-    static const char* data[] = {
-        "0",
-        "1",
-        "9",
-        "10",
-        "11",
-        "12",
-        "19710426",
-        "19961111197104262002101920050730",
-    };
-    char bufa[1000];
-    char bufb[1000];
-    bigint* a = bigint_create();
-    bigint* b = bigint_create();
-    int count = sizeof(data) / sizeof(data[0]);
-    for (int j = 0; j < count; ++j) {
-        bigint_assign_string(b, data[j]);
-        OK(bigint_format(b, bufb), data[j]);
-
-        bigint_assign_bigint(a, b);
-        OK(bigint_format(a, bufa), bufb);
-    }
-
-    bigint_destroy(b);
-    bigint_destroy(a);
-    return count;
 }
 
 int main(int argc, char* argv[]) {
     (void) argc;
     (void) argv;
     test_assign_int();
-    test_assign_string();
 
     return 0;
 }
