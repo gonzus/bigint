@@ -7,8 +7,6 @@
  *
  * TODO
  *
- * Add support for subtraction.
- *
  * Implement Karatsuba multiplication algorithm -- https://en.wikipedia.org/wiki/Karatsuba_algorithm
  *
  * Add support for integer division.
@@ -95,6 +93,9 @@ void bigint_print(const char* msg, const bigint* b, FILE* stream, int newline);
 
 // Compute a = l + r and return a
 bigint* bigint_add(const bigint* l, const bigint* r, bigint* a);
+
+// Compute a = l - r and return a
+bigint* bigint_sub(const bigint* l, const bigint* r, bigint* a);
 
 // Compute a = l * r and return a
 bigint* bigint_mul(const bigint* l, const bigint* r, bigint* a);

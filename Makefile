@@ -19,6 +19,7 @@ C_SRCS = \
 TESTS = \
 	t/001_assign \
 	t/010_add \
+	t/015_sub \
 	t/020_mul \
 	t/030_factorial \
 

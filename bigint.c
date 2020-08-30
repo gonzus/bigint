@@ -33,7 +33,7 @@
 #ifdef BIGINT_LIMB_BASE
 #undef BIGINT_LIMB_BASE
 #endif
-#define BIGINT_LIMB_BASE ((bigint_larger_t)17)
+#define BIGINT_LIMB_BASE ((bigint_larger_t)10)
 #endif
 
 #define SET_DIGIT(b, p, value, base) \
@@ -46,6 +46,7 @@
 static void enlarge(bigint* b, size_t p);
 static void bigint_ass_base(bigint* b, unsigned long long value, bigint_larger_t base);
 static void bigint_add_base(const bigint* b, const bigint* n, bigint* t, bigint_larger_t base);
+static void bigint_sub_base(const bigint* l, const bigint* r, bigint* a, bigint_larger_t base);
 static void bigint_mul_base(const bigint* b, const bigint* n, bigint* t, bigint_larger_t base);
 
 #if defined(SHOW) && SHOW > 0
@@ -116,6 +117,32 @@ int bigint_is_one(const bigint* b) {
     return b->pos == 1 && b->lmb[0] == 1 && !b->neg;
 }
 
+static int bigint_cmp_abs(const bigint* a, const bigint* b) {
+    if (a->pos > b->pos) {
+        // a has more digits than b
+        return +1;
+    }
+    if (a->pos < b->pos) {
+        // a has fewer digits than b
+        return -1;
+    }
+
+    // a and b have the same amount of digits
+    for (int j = a->pos - 1; j >= 0; --j) {
+        if (a->lmb[j] > b->lmb[j]) {
+            // a's digit > b's digit
+            return +1;
+        }
+        if (a->lmb[j] < b->lmb[j]) {
+            // a's digit < b's digit
+            return -1;
+        }
+    }
+
+    // they are the same!
+    return 0;
+}
+
 int bigint_compare(const bigint* a, const bigint* b) {
     if (!a->neg && b->neg) {
         // a > 0 and b < 0
@@ -127,31 +154,8 @@ int bigint_compare(const bigint* a, const bigint* b) {
     }
 
     // a and b have the same sign
-    // cmp is -1 is both a and b are negative, +1 if both are positive
-    int cmp = a->neg ? -1 : +1;
-    if (a->pos > b->pos) {
-        // a has more digits than b
-        return +cmp;
-    }
-    if (a->pos < b->pos) {
-        // a has fewer digits than b
-        return -cmp;
-    }
-
-    // a and b have the same amount of digits
-    for (int j = a->pos - 1; j >= 0; --j) {
-        if (a->lmb[j] > b->lmb[j]) {
-            // a's digit > b's digit
-            return +cmp;
-        }
-        if (a->lmb[j] < b->lmb[j]) {
-            // a's digit < b's digit
-            return -cmp;
-        }
-    }
-
-    // they are the same!
-    return 0;
+    int cmp = bigint_cmp_abs(a, b);
+    return a->neg ? -cmp : +cmp;
 }
 
 bigint* bigint_assign_integer(bigint* b, long long value) {
@@ -304,11 +308,40 @@ void bigint_print(const char* msg, const bigint* b, FILE* stream, int newline) {
 }
 
 bigint* bigint_add(const bigint* l, const bigint* r, bigint* a) {
-    uint8_t s = l->neg == r->neg ? 0 : 1;
-    // TODO: implement subtraction
-    assert(!s); // must have equal sign for now
-    bigint_add_base(l, r, a, BIGINT_LIMB_BASE);
-    a->neg = l->neg;
+    if (l->neg != r->neg) {
+        int cmp = bigint_cmp_abs(l, r);
+        if (cmp == 0) {
+            bigint_clear(a);
+        } else if (cmp > 0) {
+            bigint_sub_base(l, r, a, BIGINT_LIMB_BASE);
+            a->neg = l->neg;
+        } else {
+            bigint_sub_base(r, l, a, BIGINT_LIMB_BASE);
+            a->neg = r->neg;
+        }
+    } else {
+        bigint_add_base(l, r, a, BIGINT_LIMB_BASE);
+        a->neg = l->neg;
+    }
+    return a;
+}
+
+bigint* bigint_sub(const bigint* l, const bigint* r, bigint* a) {
+    if (l->neg != r->neg) {
+        bigint_add_base(l, r, a, BIGINT_LIMB_BASE);
+        a->neg = l->neg;
+    } else {
+        int cmp = bigint_cmp_abs(l, r);
+        if (cmp == 0) {
+            bigint_clear(a);
+        } else if (cmp > 0) {
+            bigint_sub_base(l, r, a, BIGINT_LIMB_BASE);
+            a->neg = l->neg;
+        } else {
+            bigint_sub_base(r, l, a, BIGINT_LIMB_BASE);
+            a->neg = !r->neg;
+        }
+    }
     return a;
 }
 
@@ -398,6 +431,41 @@ static void bigint_add_base(const bigint* l, const bigint* r, bigint* a, bigint_
     if (a->pos < p) {
         a->pos = p;
     }
+}
+
+static void bigint_sub_base(const bigint* l, const bigint* r, bigint* a, bigint_larger_t base) {
+    assert(l->pos > r->pos || (l->pos == r->pos && l->lmb[l->pos-1] >= r->lmb[r->pos-1]));
+    bigint_clear(a);
+    bigint_larger_t borrow = 0;
+    bigint_larger_t tally = 0;
+    uint64_t p = 0;
+    uint64_t t = 0;
+    while (p < l->pos) {
+        tally = borrow;
+        if (p < r->pos) {
+            tally += r->lmb[p];
+        }
+        borrow = 0;
+        if (tally <= l->lmb[p]) {
+            tally = l->lmb[p] - tally;
+        } else {
+            tally = l->lmb[p] + base - tally;
+            borrow = 1;
+        }
+        if (tally > 0) {
+            t = p;
+        }
+        SET_DIGIT(a, p, tally, base);
+        ++p;
+    }
+    while (tally) {
+        if (tally > 0) {
+            t = p;
+        }
+        SET_DIGIT(a, p, tally, base);
+        ++p;
+    }
+    a->pos = t+1;
 }
 
 static void bigint_mul_base(const bigint* l, const bigint* r, bigint* a, bigint_larger_t base) {
