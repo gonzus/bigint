@@ -5,7 +5,9 @@ LIBNAME = libbigint
 #-----------
 
 CFLAGS += -Wall -Wextra -Wpedantic -Wshadow
-CFLAGS += -g
+# CFLAGS += -g
+CFLAGS += -O
+# CFLAGS += -pg
 # CFLAGS += -DDEBUG
 
 LIBS = -lm
@@ -17,12 +19,11 @@ C_SRCS = \
 TESTS = \
 	t/001_assign \
 	t/010_add \
-	t/011_sub \
+	t/015_sub \
 	t/020_mul \
 	t/030_factorial \
 
 PERFS = \
-	p/sub \
 	p/mul \
 	p/factorial \
 

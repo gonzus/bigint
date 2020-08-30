@@ -1,13 +1,16 @@
 #include <assert.h>
-#include <stdio.h>
+#include <ctype.h>
+#include <inttypes.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "bigint.h"
 
+#define DEBUG 0
+#define SHOW 0
+
 #if BIGINT_LIMB_BITS == 32
-// #define BIGINT_LIMB_BASE (((bigint_larger_t)UINT32_MAX)+1)
-#define BIGINT_LIMB_BASE (11)
+#define BIGINT_LIMB_BASE (((bigint_larger_t)UINT32_MAX)+1)
 #define BIGINT_LIMB_FMT PRIu32
 #define BIGINT_LARGER_FMT PRIu64
 #endif
@@ -24,732 +27,464 @@
 #define BIGINT_LARGER_FMT PRIu16
 #endif
 
-static void show(const char* msg,
-                 const bigint* b,
-                 bigint_larger_t base,
-                 bigint_larger_t value)
-{
-#if defined(DEBUG) && (DEBUG > 0)
-    printf("%s base %"BIGINT_LARGER_FMT" size %u %c [",
-           msg, base, b->pos, b->negative ? '-' : '+');
-    for (int first = 1, j = b->pos - 1; j >= 0; first = 0, --j) {
-        printf("%s%"BIGINT_LIMB_FMT"", first ? "" : ":", b->limbs[j]);
-    }
-    printf("] -- %"BIGINT_LARGER_FMT"\n", value);
-#else
-    (void) msg;
-    (void) b;
-    (void) base;
-    (void) value;
+#if 0
+// set an arbitrary base, to prove it works with weird sizes
+// NOTE: this has a HUGE negative impact in performance!!!
+#ifdef BIGINT_LIMB_BASE
+#undef BIGINT_LIMB_BASE
 #endif
-}
-
-static void check_size(bigint* b, size_t p)
-{
-    if (b->size > p) {
-        return;
-    }
-
-    size_t size = b->size ? b->size : 1;
-    while (size <= p) {
-        size <<= 1;
-    }
-#if defined(DEBUG) && (DEBUG > 0)
-    printf("GROW %p %zu -> %zu\n", b, b->size, size);
+#define BIGINT_LIMB_BASE ((bigint_larger_t)10)
 #endif
-    b->limbs = realloc(b->limbs, size * sizeof(bigint_limb_t));
-    b->size = size;
-}
 
 #define SET_DIGIT(b, p, value, base) \
     do { \
-        check_size(b, p); \
-        b->limbs[p] = value % base; \
+        if (b->cap <= p) { enlarge(b, p); } \
+        b->lmb[p] = value % base; \
         value /= base; \
     } while (0)
 
-static void incNumberByValue(bigint* b,
-                             bigint_larger_t base,
-                             bigint_larger_t value)
-{
-    show(">inc", b, base, value);
-    bigint_larger_t overflow = value;
-    int p = 0;
-    while (p < b->pos) {
-        if (!overflow) {
-            break;
-        }
+static void enlarge(bigint* b, size_t p);
+static void bigint_ass_base(bigint* b, unsigned long long value, bigint_larger_t base);
+static void bigint_add_base(const bigint* b, const bigint* n, bigint* t, bigint_larger_t base);
+static void bigint_sub_base(const bigint* l, const bigint* r, bigint* a, bigint_larger_t base);
+static void bigint_mul_base(const bigint* b, const bigint* n, bigint* t, bigint_larger_t base);
 
-        bigint_larger_t tmp = b->limbs[p] + overflow;
-        SET_DIGIT(b, p, tmp, base);
-        ++p;
-        overflow = tmp;
+#if defined(SHOW) && SHOW > 0
+static void show(const char* msg, const bigint* b) {
+    if (msg && msg[0] != '\0') {
+        printf("%s | ", msg);
     }
-    while (overflow) {
-        SET_DIGIT(b, p, overflow, base);
-        ++p;
-    }
-    if (b->pos < p) {
-        b->pos = p;
-    }
-    show("<inc", b, base, value);
-}
-
-static void mulNumberByValue(bigint* b,
-                             bigint_larger_t base,
-                             bigint_larger_t value)
-{
-    show(">mul", b, base, value);
-    bigint_larger_t overflow = 0;
-    int p = 0;
-    while (p < b->pos) {
-        bigint_larger_t tmp = b->limbs[p] * value + overflow;
-        SET_DIGIT(b, p, tmp, base);
-        ++p;
-        overflow = tmp;
-    }
-    while (overflow) {
-        SET_DIGIT(b, p, overflow, base);
-        ++p;
-    }
-    if (b->pos < p) {
-        b->pos = p;
-    }
-    show("<mul", b, base, value);
-}
-
-static void convertToBase(const bigint* b,
-                          bigint_limb_t base,
-                          bigint* num)
-{
-#if defined(DEBUG) && (DEBUG > 0)
-    printf("Will convert to base %"BIGINT_LIMB_FMT": [", base);
-    for (int j = b->pos - 1; j >= 0; --j) {
-        printf("%s%"BIGINT_LIMB_FMT"", j == b->pos - 1 ? "" : ":", b->limbs[j]);
+    printf("size %u [", b->pos);
+    for (int first = 1, j = b->pos - 1; j >= 0; first = 0, --j) {
+        printf("%s%"BIGINT_LIMB_FMT, first ? "" : ":", b->lmb[j]);
     }
     printf("]\n");
+    fflush(stdout);
+    (void) msg;
+    (void) b;
+}
 #endif
 
-    for (int j = b->pos - 1; j >= 0; --j) {
-        mulNumberByValue(num, base, BIGINT_LIMB_BASE);
-        incNumberByValue(num, base, b->limbs[j]);
-    }
-}
-
-static int magnitudeCmpBigint(const bigint* a, const bigint* b)
-{
-    if (a->pos > b->pos)
-        return +1;
-    if (a->pos < b->pos)
-        return -1;
-    for (int j = a->pos - 1; j >= 0; --j) {
-        if (a->limbs[j] > b->limbs[j])
-            return +1;
-        if (a->limbs[j] < b->limbs[j])
-            return -1;
-    }
-    return 0;
-}
-
-static int magnitudeCmpInteger(const bigint* a, long b)
-{
-    unsigned long x = (unsigned long) (b < 0 ? -b : b);
-    bigint_larger_t val = 0;
-    bigint_larger_t mul = 1;
-    for (int j = 0; j < a->pos; ++j) {
-        val += mul * a->limbs[j];
-        if (val > x) {
-            return 1;
-        }
-        mul *= BIGINT_LIMB_BASE;
-    }
-    if (val < x) {
-        return -1;
-    }
-    return 0;
-}
-
-bigint* bigint_init(bigint* b)
-{
-    b->size = b->pos = 0;
-    b->negative = 0;
-    b->limbs = 0;
+bigint* bigint_create(void) {
+    bigint* b = (bigint*) malloc(sizeof(bigint));
+    memset(b, 0, sizeof(bigint));
 #if defined(DEBUG) && (DEBUG > 0)
-    printf("INIT %p\n", b);
+    printf("CREATE %p\n", b);
 #endif
     return b;
 }
 
-bigint* bigint_fini(bigint* b)
-{
-#if defined(DEBUG) && (DEBUG > 0)
-    printf("FINI %p\n", b);
-#endif
-    free(b->limbs);
-    b->limbs = 0;
-    b->negative = 0;
-    b->size = b->pos = 0;
+bigint* bigint_clone(bigint* o) {
+    bigint* b = bigint_create();
+    b->neg = o->neg;
+    b->pos = o->pos;
+    b->cap = o->cap;
+    b->lmb = realloc(0, b->cap * sizeof(bigint_limb_t));
+    for (uint64_t j = 0; j < o->pos; ++j) {
+        b->lmb[j] = o->lmb[j];
+    }
+    memset(b->lmb + b->pos, 0, (b->cap - b->pos) * sizeof(bigint_limb_t));
     return b;
 }
 
-bigint* bigint_clear(bigint* b)
-{
+void bigint_destroy(bigint* b) {
+#if defined(DEBUG) && (DEBUG > 0)
+    printf("DESTROY %p\n", b);
+#endif
+    if (b->lmb) {
+        free((void*) b->lmb);
+        b->lmb = 0;
+    }
+    free((void*) b);
+    b = 0;
+}
+
+bigint* bigint_clear(bigint* b) {
+    memset(b->lmb, 0, b->pos * sizeof(bigint_limb_t));
+    b->neg = 0;
     b->pos = 0;
-    b->negative = 0;
 #if defined(DEBUG) && (DEBUG > 0)
     printf("CLEAR %p\n", b);
 #endif
     return b;
 }
 
-bigint* bigint_pack(bigint* b)
-{
-    int p = b->pos - 1;
-    while (p >= 0) {
-        if (b->limbs[p] > 0) {
-            break;
+int bigint_is_zero(const bigint* b) {
+    return b->pos == 0 || (b->pos == 1 && b->lmb[0] == 0);
+}
+
+int bigint_is_one(const bigint* b) {
+    return b->pos == 1 && b->lmb[0] == 1 && !b->neg;
+}
+
+static int bigint_cmp_abs(const bigint* a, const bigint* b) {
+    if (a->pos > b->pos) {
+        // a has more digits than b
+        return +1;
+    }
+    if (a->pos < b->pos) {
+        // a has fewer digits than b
+        return -1;
+    }
+
+    // a and b have the same amount of digits
+    for (int j = a->pos - 1; j >= 0; --j) {
+        if (a->lmb[j] > b->lmb[j]) {
+            // a's digit > b's digit
+            return +1;
         }
-        --p;
+        if (a->lmb[j] < b->lmb[j]) {
+            // a's digit < b's digit
+            return -1;
+        }
     }
-    b->pos = p + 1;
-    if (b->pos == 0) {
-        b->negative = 0;
+
+    // they are the same!
+    return 0;
+}
+
+int bigint_compare(const bigint* a, const bigint* b) {
+    if (!a->neg && b->neg) {
+        // a > 0 and b < 0
+        return +1;
     }
-    return b;
-}
-
-bigint* bigint_negate(bigint* b)
-{
-    if (b->pos > 0) {
-        b->negative = 1 - b->negative;
+    if (a->neg && !b->neg) {
+        // a < 0 and b > 0
+        return -1;
     }
-    return b;
+
+    // a and b have the same sign
+    int cmp = bigint_cmp_abs(a, b);
+    return a->neg ? -cmp : +cmp;
 }
 
-int bigint_is_zero(const bigint* b)
-{
-    return b->pos == 0;
-}
-
-int bigint_is_one(const bigint* b, int sign)
-{
-    return (b->pos == 1 &&
-            b->limbs[0] == 1 &&
-            ((sign < 0 &&  b->negative) ||
-             (sign > 0 && !b->negative) ||
-             (sign == 0)));
-}
-
-int bigint_is_positive(const bigint* b)
-{
-    return (b->pos > 0 &&
-            !b->negative);
-}
-
-int bigint_is_negative(const bigint* b)
-{
-    return (b->pos > 0 &&
-            b->negative);
-}
-
-bigint* bigint_assign_integer(bigint* b,
-                              long value)
-{
+bigint* bigint_assign_integer(bigint* b, long long value) {
 #if defined(DEBUG) && (DEBUG > 0)
-    printf("Assigning integer [%ld]\n", value);
+    printf("Assigning integer [%lld]\n", value);
+#endif
+    uint8_t n = 0;
+    unsigned long long v = 0;
+    if (value >= 0) {
+        v = value;
+    } else {
+        v = -value;
+        n = 1;
+    }
+    bigint_ass_base(b, v, BIGINT_LIMB_BASE);
+    b->neg = n;
+    return b;
+}
+
+bigint* bigint_assign_string(bigint* b, const char* value) {
+    enum {
+        STATE_INIT,
+        STATE_DIGIT,
+    };
+#if defined(DEBUG) && (DEBUG > 0)
+    printf("Assigning string [%s]\n", value);
+#endif
+    int state = STATE_INIT;
+    int neg = 0;
+    bigint_clear(b);
+    bigint* m = bigint_create();
+    bigint_assign_integer(m, 10);
+    bigint* d = bigint_create();
+    bigint* t = bigint_create();
+    uint32_t l = strlen(value);
+    for (uint32_t j = 0; j < l; ++j) {
+        uint8_t digit = UINT8_MAX;
+        if (isspace(value[j])) {
+            if (state == STATE_INIT) {
+                continue;
+            } else {
+                break;
+            }
+        } else if (value[j] == '+') {
+            if (state == STATE_INIT) {
+                state = STATE_DIGIT;
+                continue;
+            } else {
+                break;
+            }
+        } else if (value[j] == '-') {
+            if (state == STATE_INIT) {
+                state = STATE_DIGIT;
+                neg = 1;
+                continue;
+            } else {
+                break;
+            }
+        } else if (isdigit(value[j])) {
+            if (state == STATE_INIT || state == STATE_DIGIT) {
+                state = STATE_DIGIT;
+                digit = value[j] - '0';
+            } else {
+                break;
+            }
+        }
+        assert(digit != UINT8_MAX); // could not read a valid digit
+        bigint_assign_integer(d, digit);
+        // show("DIGIT", d);
+        bigint_mul_base(b, m, t, BIGINT_LIMB_BASE);
+        // show("AFTER MUL", t);
+        bigint_add_base(t, d, b, BIGINT_LIMB_BASE);
+        // show("AFTER ADD", b);
+    }
+    assert(state == STATE_DIGIT); // could not read any digit
+    b->neg = neg;
+    bigint_destroy(t);
+    bigint_destroy(d);
+    bigint_destroy(m);
+    return b;
+}
+
+bigint* bigint_assign_bigint(bigint* b, const bigint* n) {
+#if defined(DEBUG) && (DEBUG > 0)
+    bigint_print("Assigning bigint ", n, stdout, 1);
 #endif
     bigint_clear(b);
-    if (value < 0) {
-        b->negative = 1;
-        value = -value;
-    }
-    while (value > 0) {
-        SET_DIGIT(b, b->pos, value, BIGINT_LIMB_BASE);
-        ++b->pos;
-    }
-    return b;
-}
-
-bigint* bigint_assign_string(bigint* b,
-                             const char* value,
-                             int base)
-{
-    assert(base >= 2 && base <= 36);
-#if defined(DEBUG) && (DEBUG > 0)
-    printf("Assigning string [%s] (base %u)\n", value, base);
-#endif
-    bigint_clear(b);
-    for (int j = 0; value[j] != '\0'; ++j) {
-        uint8_t digit = value[j];
-        if (digit == '+') {
-            b->negative = 0;
-            continue;
-        }
-        if (digit == '-') {
-            b->negative = 1;
-            continue;
-        }
-        if (digit >= '0' && digit <= '9') {
-            digit = digit - '0';
-        } else if (digit >= 'a' && digit <= 'z') {
-            digit = digit - 'a' + 10;
-        } else if (digit >= 'A' && digit <= 'Z') {
-            digit = digit - 'A' + 10;
-        } else {
-            digit = UINT8_MAX;
-        }
-        assert(digit != UINT8_MAX);
-
-        mulNumberByValue(b, BIGINT_LIMB_BASE, base);
-        incNumberByValue(b, BIGINT_LIMB_BASE, digit);
-    }
-
-    if (b->pos == 0) {
-        b->negative = 0;
-    }
-
-    return b;
-}
-
-bigint* bigint_assign_bigint(bigint* b,
-                             const bigint* n)
-{
-#if defined(DEBUG) && (DEBUG > 0)
-    printf("Assigning bigint ");
-    bigint_print(n, stdout, 1);
-#endif
-
-    bigint_clear(b);
-    b->negative = n->negative;
+    b->neg = n->neg;
     while (b->pos < n->pos) {
-        bigint_larger_t tmp = n->limbs[b->pos];
-        SET_DIGIT(b, b->pos, tmp, BIGINT_LIMB_BASE);
+        bigint_limb_t t = n->lmb[b->pos];
+        SET_DIGIT(b, b->pos, t, BIGINT_LIMB_BASE);
         ++b->pos;
     }
-
     return b;
 }
 
-char* bigint_format(const bigint* b, char* buf)
-{
-    int p = 0;
-    bigint num;
-    bigint_init(&num);
+char* bigint_format(const bigint* b, char* buf) {
+    // show("Formatting", b);
+    bigint* c = bigint_create();
 
-    convertToBase(b, 10, &num);
-    if (b->negative) {
+    bigint* m = bigint_create();
+    bigint_ass_base(m, BIGINT_LIMB_BASE, 10);
+    // show("USING BASE", m);
+    bigint* d = bigint_create();
+    bigint* t = bigint_create();
+    for (int j = b->pos - 1; j >= 0; --j) {
+        bigint_assign_integer(d, b->lmb[j]);
+        // show("DIGIT", d);
+        bigint_mul_base(c, m, t, 10);
+        // show("AFTER MUL", c);
+        bigint_add_base(t, d, c, 10);
+        // show("AFTER ADD", c);
+    }
+    bigint_destroy(t);
+    bigint_destroy(d);
+    bigint_destroy(m);
+
+    int p = 0;
+    int e = 1;
+    if (b->neg) {
         buf[p++] = '-';
     }
-    for (int j = num.pos - 1; j >= 0; --j) {
-        buf[p++] = num.limbs[j] + '0';
+    for (int j = c->pos - 1; j >= 0; --j) {
+        buf[p++] = c->lmb[j] + '0';
+        e = 0;
     }
-    if (num.pos == 0) {
+    if (e) {
         buf[p++] = '0';
+        e = 0;
     }
     buf[p] = '\0';
 
-    bigint_fini(&num);
+    bigint_destroy(c);
+    // printf("FORMATTED [%s]\n", buf);
     return buf;
 }
 
-void bigint_print(const char* msg,
-                  const bigint* b,
-                  FILE* stream,
-                  int newline)
-{
+void bigint_print(const char* msg, const bigint* b, FILE* stream, int newline) {
+    // TODO: change this to use a buffer
     char buf[1000];
     bigint_format(b, buf);
 
     if (msg && msg[0]) {
         fprintf(stream, "%s", msg);
     }
-
     fprintf(stream, "%s", buf);
-
     if (newline) {
         fputc('\n', stream);
     }
 }
 
-int bigint_compare(const bigint* a, const bigint* b)
-{
-    if (!a->negative && b->negative) {
-        return +1;
-    }
-    if ( a->negative && !b->negative) {
-        return -1;
-    }
-
-    int greater = +1;
-    if (a->negative) {
-        greater = -1;
-    }
-
-    if (a->pos > b->pos)
-        return +greater;
-    if (a->pos < b->pos)
-        return -greater;
-    for (int j = a->pos - 1; j >= 0; --j) {
-        if (a->limbs[j] > b->limbs[j])
-            return +greater;
-        if (a->limbs[j] < b->limbs[j])
-            return -greater;
-    }
-
-    return 0;
-}
-
-/*
- * ===================
- * ADDITION ALGORITHMS
- * ===================
- */
-
-/*
- * Add |n| to |b|; don't even look at signs.
- */
-static bigint* bigint_addbi_absolute(bigint* b, const bigint* n)
-{
-    bigint_larger_t overflow = 0;
-    int p = 0;
-    while (p < b->pos || p < n->pos) {
-        if (p < b->pos) {
-            overflow += b->limbs[p];
-        }
-        if (p < n->pos) {
-            overflow += n->limbs[p];
-        }
-        SET_DIGIT(b, p, overflow, BIGINT_LIMB_BASE);
-        ++p;
-    }
-    while (overflow) {
-        SET_DIGIT(b, p, overflow, BIGINT_LIMB_BASE);
-        ++p;
-    }
-    if (b->pos < p) {
-        b->pos = p;
-    }
-
-    return b;
-}
-
-/*
- * Subtract |n| from |b|; don't even look at signs.
- * Assume |n| < |b|
- */
-static bigint* bigint_subbi_absolute(bigint* b, const bigint* n)
-{
-    bigint_larger_t borrow = 0;
-    int p = 0;
-    while (p < b->pos) {
-        if (borrow == 0 && p >= n->pos) {
-            break;
-        }
-
-        bigint_larger_t c = 0;
-        if (p < b->pos) {
-            c = b->limbs[p];
-        }
-
-        bigint_larger_t m = 0;
-        if (p < n->pos) {
-            m = n->limbs[p];
-        }
-
-        if (c >= (m + borrow)) {
-            c -= borrow;
-            borrow = 0;
+bigint* bigint_add(const bigint* l, const bigint* r, bigint* a) {
+    if (l->neg != r->neg) {
+        int cmp = bigint_cmp_abs(l, r);
+        if (cmp == 0) {
+            bigint_clear(a);
+        } else if (cmp > 0) {
+            bigint_sub_base(l, r, a, BIGINT_LIMB_BASE);
+            a->neg = l->neg;
         } else {
-            c += BIGINT_LIMB_BASE - borrow;
-            borrow = 1;
+            bigint_sub_base(r, l, a, BIGINT_LIMB_BASE);
+            a->neg = r->neg;
         }
-        c -= m;
-        SET_DIGIT(b, p, c, BIGINT_LIMB_BASE);
-        ++p;
+    } else {
+        bigint_add_base(l, r, a, BIGINT_LIMB_BASE);
+        a->neg = l->neg;
     }
-    if (b->pos < p) {
-        b->pos = p;
-    }
-
-    bigint_pack(b);
-    return b;
+    return a;
 }
 
-bigint* bigint_add_bigint(bigint* b, const bigint* n)
-{
-    if (b->negative == n->negative) {
-        // b and n have same sign; simply add them
-        return bigint_addbi_absolute(b, n);
-    }
-
-    // b and n have opposite signs
-    int m = magnitudeCmpBigint(b, n);
-    if (m == 0) {
-        // |b| = |n|
-        // therefore, b must be set to 0
-        bigint_clear(b);
-        return b;
-    }
-
-    if (m > 0) {
-        // |b| > |n|
-        // we subtract |n| from b
-        return bigint_subbi_absolute(b, n);
-    }
-
-    // |b| < |n|
-    // we swap b and n, and then
-    // we subtract |n| from b
-    bigint t;
-    bigint_init(&t);
-    bigint_assign_bigint(&t, b);
-    bigint_assign_bigint( b, n);
-    bigint_subbi_absolute(b, &t);
-    bigint_fini(&t);
-    return b;
-}
-
-
-/*
- * Add |n| to |b|; don't even look at signs.
- */
-static bigint* bigint_addint_absolute(bigint* b, long n)
-{
-    if (n < 0) {
-        n = -n;
-    }
-    bigint_larger_t overflow = 0;
-    int p = 0;
-    while (p < b->pos || n > 0) {
-        if (p < b->pos) {
-            overflow += b->limbs[p];
-        }
-        if (n > 0) {
-            overflow += n % BIGINT_LIMB_BASE;
-            n /= BIGINT_LIMB_BASE;
-        }
-        SET_DIGIT(b, p, overflow, BIGINT_LIMB_BASE);
-        ++p;
-    }
-    while (overflow) {
-        SET_DIGIT(b, p, overflow, BIGINT_LIMB_BASE);
-        ++p;
-    }
-    if (b->pos < p) {
-        b->pos = p;
-    }
-
-    return b;
-}
-
-/*
- * Subtract |n| from |b|; don't even look at signs.
- * Assume |n| < |b|
- */
-static bigint* bigint_subint_absolute(bigint* b, long n)
-{
-    if (n < 0) {
-        n = -n;
-    }
-    bigint_larger_t borrow = 0;
-    int p = 0;
-    while (p < b->pos) {
-        if (borrow == 0 && n <= 0) {
-            break;
-        }
-
-        bigint_larger_t c = 0;
-        if (p < b->pos) {
-            c = b->limbs[p];
-        }
-
-        bigint_larger_t m = 0;
-        if (n > 0) {
-            m = n % BIGINT_LIMB_BASE;
-            n /= BIGINT_LIMB_BASE;
-        }
-
-        if (c >= (m + borrow)) {
-            c -= borrow;
-            borrow = 0;
+bigint* bigint_sub(const bigint* l, const bigint* r, bigint* a) {
+    if (l->neg != r->neg) {
+        bigint_add_base(l, r, a, BIGINT_LIMB_BASE);
+        a->neg = l->neg;
+    } else {
+        int cmp = bigint_cmp_abs(l, r);
+        if (cmp == 0) {
+            bigint_clear(a);
+        } else if (cmp > 0) {
+            bigint_sub_base(l, r, a, BIGINT_LIMB_BASE);
+            a->neg = l->neg;
         } else {
-            c += BIGINT_LIMB_BASE - borrow;
-            borrow = 1;
+            bigint_sub_base(r, l, a, BIGINT_LIMB_BASE);
+            a->neg = !r->neg;
         }
-        c -= m;
-        SET_DIGIT(b, p, c, BIGINT_LIMB_BASE);
-        ++p;
     }
-    if (b->pos < p) {
-        b->pos = p;
-    }
-
-    bigint_pack(b);
-    return b;
+    return a;
 }
 
-bigint* bigint_add_integer(bigint* b, long n)
-{
-    // We reimplement the algorithm for the special case
-    // of a long; we get almost 50% increase in speed
-
-    if (b->negative == (n < 0 ? 1 : 0)) {
-        // b and n have same sign; simply add them
-        return bigint_addint_absolute(b, n);
-    }
-
-    // b and n have opposite signs
-    int m = magnitudeCmpInteger(b, n);
-    if (m == 0) {
-        // |b| = |n|
-        // therefore, b must be set to 0
-        bigint_clear(b);
-        return b;
-    }
-
-    if (m > 0) {
-        // |b| > |n|
-        // we subtract |n| from b
-        return bigint_subint_absolute(b, n);
-    }
-
-    // |b| < |n|
-    // we swap b and n, and then
-    // we subtract |n| from b
-    bigint t;
-    bigint_init(&t);
-    bigint_assign_bigint(&t, b);
-    bigint_assign_integer(b, n);
-    bigint_subbi_absolute(b, &t);
-    bigint_fini(&t);
-    return b;
+bigint* bigint_mul(const bigint* l, const bigint* r, bigint* a) {
+    uint8_t s = l->neg == r->neg ? 0 : 1;
+    bigint_mul_base(l, r, a, BIGINT_LIMB_BASE);
+    a->neg = s;
+    return a;
 }
 
-/*
- * ======================
- * SUBTRACTION ALGORITHMS
- * ======================
- */
-
-bigint* bigint_sub_bigint(bigint* b, const bigint* n)
-{
-    // Yes, this is ugly and breaks const-correctness
-    // It is also faster (around 5%) than creating a
-    // temporary to hold -n for a while...
-    bigint_negate((bigint*) n);
-    bigint_add_bigint(b, n);
-    bigint_negate((bigint*) n);
-    return b;
+bigint_limb_t bigint_mod_integer(bigint* b, bigint_limb_t value) {
+    assert(!b->neg); // must be positive for now
+    bigint_larger_t mod = 0;
+    for (int j = b->pos - 1; j >= 0; --j) {
+        mod = (mod * BIGINT_LIMB_BASE + b->lmb[j]) % value;
+    }
+    return mod;
 }
 
-bigint* bigint_sub_integer(bigint* b, long n)
-{
-    return bigint_add_integer(b, -n);
+void bigint_factorial(bigint_limb_t n, bigint* b) {
+    bigint_ass_base(b, 1, BIGINT_LIMB_BASE);
+    if (n <= 1) {
+        return;
+    }
+
+    bigint* d = bigint_create();
+    bigint* t = bigint_clone(b);
+    bigint* l = b;
+    bigint* r = t;
+    for (bigint_limb_t x = 2; x <= n; ++x) {
+        bigint_ass_base(d, x, BIGINT_LIMB_BASE);
+        bigint_mul_base(l, d, r, BIGINT_LIMB_BASE);
+        bigint* z = l;
+        l = r;
+        r = z;
+    }
+    if (l != b) {
+        bigint_assign_bigint(b, t);
+    }
+    bigint_destroy(t);
+    bigint_destroy(d);
 }
 
-/*
- * =========================
- * MULTIPLICATION ALGORITHMS
- * =========================
- */
-
-bigint* bigint_mul_bigint(bigint* b, const bigint* n)
-{
-#if 0
-    /*
-     * These optimizations are not necessary because the
-     * loop below works in all these cases.
-     * Should we keep them or remove them?
-     * MEASURE THIS!!!
-     */
-    if (bigint_is_zero(b) ||
-        bigint_is_zero(n)) {
-        bigint_clear(b);
-        return b;
+static void enlarge(bigint* b, size_t p) {
+    if (b->cap > p) {
+        return;
     }
-
-    if (bigint_is_one(n, +1)) {
-        return b;
+    size_t size = b->cap ? 2*b->cap : 1;
+    while (size <= p) {
+        size *= 2;
     }
-
-    if (bigint_is_one(n, -1)) {
-        bigint_negate(b);
-        return b;
-    }
+#if defined(DEBUG) && (DEBUG > 0)
+    printf("GROW %p %u -> %zu\n", b, b->cap, size);
 #endif
-
-    bigint t;
-    bigint_init(&t);
-
-    bigint_assign_bigint(&t, b);
-    bigint_clear(b);
-    b->negative = (t.negative != n->negative);
-    for (int p = 0; p < t.pos; ++p) {
-        bigint_larger_t total = 0;
-        int q;
-        for (q = 0; q < n->pos; ++q) {
-            if (p+q < b->pos) {
-                total += b->limbs[p+q];
-            }
-            total += (bigint_larger_t) t.limbs[p] * (bigint_larger_t) n->limbs[q];
-            SET_DIGIT(b, p+q, total, BIGINT_LIMB_BASE);
-        }
-        for (; total; ++q) {
-            SET_DIGIT(b, p+q, total, BIGINT_LIMB_BASE);
-        }
-        if (b->pos < p+q) {
-            b->pos = p+q;
-        }
-    }
-    bigint_pack(b);
-
-    bigint_fini(&t);
-    return b;
+    bigint_limb_t* limb = realloc(b->lmb, size * sizeof(bigint_limb_t));
+    memset(limb + b->cap, 0, (size - b->cap) * sizeof(bigint_limb_t));
+    b->lmb = limb;
+    b->cap = size;
 }
 
-bigint* bigint_mul_integer(bigint* b, long n)
-{
-    // We reimplement the algorithm for the special case
-    // of a long; we get almost 50% increase in speed
-
-    bigint t;
-    bigint_init(&t);
-
-    bigint_assign_bigint(&t, b);
+static void bigint_ass_base(bigint* b, unsigned long long value, bigint_larger_t base) {
     bigint_clear(b);
-    b->negative = (t.negative != (n < 0 ? 1 : 0));
-    if (n < 0) {
-        n = -n;
+    while (value > 0) {
+        SET_DIGIT(b, b->pos, value, base);
+        ++b->pos;
     }
-    for (int p = 0; p < t.pos; ++p) {
-        bigint_larger_t total = 0;
-        int q;
-        int m = n;
-        for (q = 0; m > 0; ++q) {
-            if (p+q < b->pos) {
-                total += b->limbs[p+q];
-            }
-            total += (bigint_larger_t) t.limbs[p] * (bigint_larger_t) (m % BIGINT_LIMB_BASE);
-            m /= BIGINT_LIMB_BASE;
-            SET_DIGIT(b, p+q, total, BIGINT_LIMB_BASE);
-        }
-        for (; total; ++q) {
-            SET_DIGIT(b, p+q, total, BIGINT_LIMB_BASE);
-        }
-        if (b->pos < p+q) {
-            b->pos = p+q;
-        }
-    }
-    bigint_pack(b);
-
-    bigint_fini(&t);
-    return b;
 }
 
-/*
- * ===================
- * DIVISION ALGORITHMS
- * ===================
- */
+static void bigint_add_base(const bigint* l, const bigint* r, bigint* a, bigint_larger_t base) {
+    bigint_clear(a);
+    bigint_larger_t overflow = 0;
+    uint64_t p = 0;
+    while (p < l->pos || p < r->pos) {
+        if (p < l->pos) {
+            overflow += l->lmb[p];
+        }
+        if (p < r->pos) {
+            overflow += r->lmb[p];
+        }
+        SET_DIGIT(a, p, overflow, base);
+        ++p;
+    }
+    while (overflow) {
+        SET_DIGIT(a, p, overflow, base);
+        ++p;
+    }
+    if (a->pos < p) {
+        a->pos = p;
+    }
+}
 
-// TODO
+static void bigint_sub_base(const bigint* l, const bigint* r, bigint* a, bigint_larger_t base) {
+    assert(l->pos > r->pos || (l->pos == r->pos && l->lmb[l->pos-1] >= r->lmb[r->pos-1]));
+    bigint_clear(a);
+    bigint_larger_t borrow = 0;
+    bigint_larger_t tally = 0;
+    uint64_t p = 0;
+    uint64_t t = 0;
+    while (p < l->pos) {
+        tally = borrow;
+        if (p < r->pos) {
+            tally += r->lmb[p];
+        }
+        borrow = 0;
+        if (tally <= l->lmb[p]) {
+            tally = l->lmb[p] - tally;
+        } else {
+            tally = l->lmb[p] + base - tally;
+            borrow = 1;
+        }
+        if (tally > 0) {
+            t = p;
+        }
+        SET_DIGIT(a, p, tally, base);
+        ++p;
+    }
+    while (tally) {
+        if (tally > 0) {
+            t = p;
+        }
+        SET_DIGIT(a, p, tally, base);
+        ++p;
+    }
+    a->pos = t+1;
+}
+
+static void bigint_mul_base(const bigint* l, const bigint* r, bigint* a, bigint_larger_t base) {
+    // show("MUL l", l);
+    // show("MUL r", r);
+    bigint_clear(a);
+    enlarge(a, l->pos + r->pos);
+    for (uint64_t p = 0; p < l->pos; ++p) {
+        bigint_larger_t total = 0;
+        uint64_t q;
+        for (q = 0; q < r->pos; ++q) {
+            total += (bigint_larger_t) a->lmb[p+q] + (bigint_larger_t) l->lmb[p] * (bigint_larger_t) r->lmb[q];
+            SET_DIGIT(a, p+q, total, base);
+        }
+        for (; total; ++q) {
+            SET_DIGIT(a, p+q, total, base);
+        }
+        if (a->pos < p+q) {
+            a->pos = p+q;
+        }
+    }
+}

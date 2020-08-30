@@ -1,9 +1,18 @@
 #ifndef BIGINT_H_
 #define BIGINT_H_
 
-#include <inttypes.h>
-#include <stddef.h>
+/*
+ * A bare-bones implementation of bigints -- integers without a size limit.
+ *
+ *
+ * TODO
+ *
+ * Implement Karatsuba multiplication algorithm -- https://en.wikipedia.org/wiki/Karatsuba_algorithm
+ *
+ * Add support for integer division.
+ */
 #include <stdint.h>
+#include <stdio.h>
 
 // Choose the bits size for limbs here; hint: larger is better
 
@@ -27,56 +36,74 @@ typedef uint16_t bigint_larger_t;
 #endif
 
 /*
- * A structure to represent an infinite precision integer.
+ * A structure to represent an infinite precision positive integer.
  *
  * I = l[0] * b^0 + l[1] * b^1 + l[2] * b^2 + ... + l[n] * b^n
  *
  * The value of b depends on the number of bits chosen with
  * constant BIGINT_LIMB_BITS.
  */
-typedef struct bigint
-{
-    bigint_limb_t* limbs;
-    size_t size;
-    int pos;
-    uint8_t negative;
+typedef struct bigint {
+    uint32_t cap;            // total size of allocated lmb array
+    uint32_t pos;            // used size of allocated lmb array
+    uint8_t neg;             // sign of number: 0=positive, 1=negative
+    bigint_limb_t* lmb;      // allocated "limb" array -- bigint "digits"
 } bigint;
 
-bigint* bigint_init(bigint* b);
-bigint* bigint_fini(bigint* b);
+// Create an empty (zero) bigint
+bigint* bigint_create(void);
+
+// Clone an existing bigint into a new one
+bigint* bigint_clone(bigint* b);
+
+// Destroy a bigint
+void bigint_destroy(bigint* b);
+
+// Clear a bigint, leaving its value as zero.
+// It does not get rid of any allocated memory, so it is cheap to reuse the
+// bigint.
 bigint* bigint_clear(bigint* b);
-bigint* bigint_pack(bigint* b);
-bigint* bigint_negate(bigint* b);
 
+// Return true if the value of b is zero.
 int bigint_is_zero(const bigint* b);
-int bigint_is_one(const bigint* b, int sign);
-int bigint_is_neg_one(const bigint* b);
-int bigint_is_positive(const bigint* b);
-int bigint_is_negative(const bigint* b);
 
-bigint* bigint_assign_integer(bigint* b,
-                              long value);
-bigint* bigint_assign_string(bigint* b,
-                             const char* value,
-                             int base);
-bigint* bigint_assign_bigint(bigint* b,
-                             const bigint* n);
+// Return true if the value of b is one.
+int bigint_is_one(const bigint* b);
 
-char* bigint_format(const bigint* b, char* buf);
-void bigint_print(const char* msg,
-                  const bigint* b,
-                  FILE* stream,
-                  int newline);
-
+// Compare two bigints a and b, returning:
+// a < b: -1   a == b: 0   a > b: +1
 int bigint_compare(const bigint* a, const bigint* b);
 
-bigint* bigint_add_integer(bigint* b, long n);
-bigint* bigint_add_bigint(bigint* b, const bigint* n);
+// Assign a numeric value to bigint b
+bigint* bigint_assign_integer(bigint* b, long long value);
 
-bigint* bigint_sub_integer(bigint* b, long n);
-bigint* bigint_sub_bigint(bigint* b, const bigint* n);
+// Assign the base-10 value stated in a string to bigint b
+bigint* bigint_assign_string(bigint* b, const char* value);
 
-bigint* bigint_mul_bigint(bigint* b, const bigint* n);
-bigint* bigint_mul_integer(bigint* b, long n);
+// Assign the value of bigint n to bigint b
+bigint* bigint_assign_bigint(bigint* b, const bigint* n);
+
+// Format bigint b as a base-10 number into a string buffer
+// TODO: change this to use a buffer
+char* bigint_format(const bigint* b, char* buf);
+
+// Print bigint b as a base-10 number into a FILE stream.
+// Optional prepending message and newline.
+void bigint_print(const char* msg, const bigint* b, FILE* stream, int newline);
+
+// Compute a = l + r and return a
+bigint* bigint_add(const bigint* l, const bigint* r, bigint* a);
+
+// Compute a = l - r and return a
+bigint* bigint_sub(const bigint* l, const bigint* r, bigint* a);
+
+// Compute a = l * r and return a
+bigint* bigint_mul(const bigint* l, const bigint* r, bigint* a);
+
+// Compute b % value
+bigint_limb_t bigint_mod_integer(bigint* b, bigint_limb_t value);
+
+// Compute n! and store the value in bigint b.
+void bigint_factorial(bigint_limb_t n, bigint* b);
 
 #endif
