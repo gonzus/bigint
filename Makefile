@@ -22,6 +22,7 @@ TESTS = \
 	t/015_sub \
 	t/020_mul \
 	t/030_factorial \
+	t/040_random \
 
 PERFS = \
 	p/mul \
